@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Intelligence Platform</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Document Intelligence Platform</h1>
+            <p>Extract and validate financial documents</p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="upload">Upload</button>
+            <button class="tab-btn" data-tab="dashboard">Dashboard</button>
+        </nav>
+
+        <!-- Upload Section -->
+        <section id="upload" class="tab-content active">
+            <div class="card">
+                <h2>Process Document</h2>
+                <form id="upload-form">
+                    <div class="form-group">
+                        <label for="document-type">Document Type</label>
+                        <select id="document-type" name="document_type" required>
+                            <option value="">Select type...</option>
+                            <option value="invoice">Invoice</option>
+                            <option value="balance_sheet">Balance Sheet</option>
+                            <option value="profit_loss">Profit & Loss</option>
+                            <option value="cash_flow">Cash Flow Statement</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="file-input">Upload File (PDF, JPG, PNG)</label>
+                        <input type="file" id="file-input" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
+                        <p class="help-text">Max 3 pages per document</p>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="process-btn">
+                        <span class="btn-text">Process Document</span>
+                        <span class="btn-loading" style="display: none;">Processing...</span>
+                    </button>
+                </form>
+
+                <div id="upload-result" class="result-panel" style="display: none;"></div>
+            </div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="tab-content">
+            <div class="card">
+                <h2>Processed Documents</h2>
+                <div id="documents-table-container">
+                    <table id="documents-table">
+                        <thead>
+                            <tr>
+                                <th>Document Name</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Processed Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="documents-table-body">
+                            <tr>
+                                <td colspan="5" class="loading">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Detail View Section -->
+        <section id="detail" class="tab-content">
+            <div class="card">
+                <button class="btn btn-secondary" id="back-to-dashboard">← Back to Dashboard</button>
+                <h2 id="detail-title">Document Details</h2>
+                
+                <div id="detail-content">
+                    <div class="detail-section">
+                        <h3>Document Information</h3>
+                        <div id="document-info"></div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>File Validation</h3>
+                        <div id="file-validation"></div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Extracted Fields</h3>
+                        <div id="extracted-fields"></div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Tables</h3>
+                        <div id="extracted-tables"></div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Financial Validations</h3>
+                        <div id="financial-validations"></div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Raw JSON</h3>
+                        <button class="btn btn-secondary" id="toggle-json">Toggle Raw JSON</button>
+                        <pre id="raw-json" style="display: none;"></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

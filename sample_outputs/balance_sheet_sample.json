@@ -1,0 +1,54 @@
+{
+  "document_name": "Consolidated Balance Sheet 2017.pdf",
+  "document_type": "balance_sheet",
+  "file_validation": {
+    "valid": true,
+    "errors": [],
+    "warnings": [],
+    "file_type": "application/pdf",
+    "page_count": 1,
+    "file_size": 135633,
+    "filename": "Consolidated Balance Sheet 2017.pdf"
+  },
+  "extracted_data": {
+    "fields": {
+      "total": {
+        "value": " 1 ",
+        "evidence": " 1 ",
+        "page_number": 1
+      },
+      "invoice_number": {
+        "value": "s",
+        "evidence": "Bills",
+        "page_number": 1
+      }
+    },
+    "tables": [],
+    "extraction_metadata": {
+      "model_used": "rule_based_fallback",
+      "document_type": "balance_sheet",
+      "total_pages": 1,
+      "extraction_method": null
+    }
+  },
+  "financial_validations": [
+    {
+      "check_name": "Balance Sheet Equation",
+      "formula": "Assets = Liabilities + Equity",
+      "inputs": {},
+      "calculated_value": null,
+      "reported_value": null,
+      "variance": null,
+      "status": "NOT_APPLICABLE"
+    }
+  ],
+  "processing_status": "SUCCESS",
+  "processing_metadata": {
+    "extraction_method": "ocr",
+    "pages_extracted": 1,
+    "total_validations": 1,
+    "failed_validations": 0
+  },
+  "error_message": null,
+  "processed_time": "2026-09-11T05:40:52.718605"
+}
