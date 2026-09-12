@@ -1,5 +1,5 @@
 // API Configuration - Update this to your deployed backend URL
-const API_BASE_URL = 'http://localhost:8001';
+const API_BASE_URL = 'http://localhost:8002/api/v1';
 
 // Tab Navigation
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -55,7 +55,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     btnLoading.style.display = 'inline';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/documents/process`, {
+        const response = await fetch(`${API_BASE_URL}/documents/process`, {
             method: 'POST',
             body: formData
         });
@@ -95,7 +95,7 @@ async function loadDocuments() {
     tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/documents/`);
+        const response = await fetch(`${API_BASE_URL}/documents/`);
         
         if (!response.ok) {
             throw new Error('Failed to load documents');
@@ -113,12 +113,24 @@ async function loadDocuments() {
                 <td>${escapeHtml(doc.document_name)}</td>
                 <td>${formatDocumentType(doc.document_type)}</td>
                 <td><span class="status-badge ${doc.processing_status}">${doc.processing_status}</span></td>
-                <td>${formatDate(doc.processed_time)}</td>
+                <td>${formatDate(doc.processed_at)}</td>
                 <td>
-                    <button class="btn-view" onclick="viewDocument('${escapeHtml(doc.document_name)}')">View</button>
+                    <button class="btn-view" data-document-name="${escapeHtml(doc.document_name)}">View</button>
                 </td>
             </tr>
         `).join('');
+        
+        // Attach event listeners to view buttons
+        const viewButtons = document.querySelectorAll('.btn-view');
+        console.log(`Found ${viewButtons.length} view buttons`);
+        viewButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const documentName = e.target.dataset.documentName;
+                console.log("View button clicked for:", documentName);
+                viewDocument(documentName);
+            });
+        });
     } catch (error) {
         tbody.innerHTML = `<tr><td colspan="5" class="loading">Error loading documents: ${error.message}</td></tr>`;
     }
@@ -126,31 +138,52 @@ async function loadDocuments() {
 
 // View Document Details
 async function viewDocument(documentName) {
-    // Switch to detail tab
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('[data-tab="detail"]').classList.add('active');
-    
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.remove('active');
-    });
-    document.getElementById('detail').classList.add('active');
-    
-    document.getElementById('detail-title').textContent = `Document: ${documentName}`;
-    
-    // Show loading state
-    document.getElementById('detail-content').innerHTML = '<p class="loading">Loading...</p>';
+    console.log("viewDocument called with:", documentName);
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/documents/${encodeURIComponent(documentName)}`);
+        // Switch to detail tab
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        const detailTab = document.querySelector('[data-tab="detail"]');
+        if (detailTab) {
+            detailTab.classList.add('active');
+            detailTab.style.display = 'inline-block';
+        } else {
+            console.error("Detail tab button not found");
+        }
+        
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        const detailContent = document.getElementById('detail');
+        if (detailContent) {
+            detailContent.classList.add('active');
+        } else {
+            console.error("Detail content div not found");
+        }
+        
+        document.getElementById('detail-title').textContent = `Document: ${documentName}`;
+        
+        // Show loading state by clearing content but keeping structure
+        document.getElementById('document-info').innerHTML = '<p class="loading">Loading...</p>';
+        document.getElementById('file-validation').innerHTML = '';
+        document.getElementById('extracted-fields').innerHTML = '';
+        document.getElementById('extracted-tables').innerHTML = '';
+        document.getElementById('financial-validations').innerHTML = '';
+        document.getElementById('raw-json').textContent = '';
+        
+        console.log("Fetching document details from:", `${API_BASE_URL}/documents/${encodeURIComponent(documentName)}`);
+        const response = await fetch(`${API_BASE_URL}/documents/${encodeURIComponent(documentName)}`);
         
         if (!response.ok) {
-            throw new Error('Failed to load document details');
+            throw new Error(`Failed to load document details: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
+        console.log("Document data received:", data);
         renderDocumentDetails(data);
     } catch (error) {
-        document.getElementById('detail-content').innerHTML = `<p class="loading">Error: ${error.message}</p>`;
+        console.error("Error in viewDocument:", error);
+        document.getElementById('document-info').innerHTML = `<p class="loading">Error: ${error.message}</p>`;
     }
 }
 
@@ -166,21 +199,25 @@ function renderDocumentDetails(data) {
             <div class="info-value">${formatDocumentType(data.document_type)}</div>
         </div>
         <div class="info-item">
-            <div class="info-label">Status</div>
-            <div class="info-value"><span class="status-badge ${data.processing_status}">${data.processing_status}</span></div>
+            <div class="info-label">Validation Status</div>
+            <div class="info-value"><span class="status-badge ${data.validation?.overall_status || 'UNKNOWN'}">${data.validation?.overall_status || 'UNKNOWN'}</span></div>
         </div>
         <div class="info-item">
             <div class="info-label">Processed Time</div>
-            <div class="info-value">${formatDate(data.processed_time)}</div>
+            <div class="info-value">${formatDate(data.processing_metadata?.processed_at)}</div>
         </div>
     `;
     
     // File Validation
     const validation = data.file_validation;
     document.getElementById('file-validation').innerHTML = `
-        <div class="field-item ${validation.valid ? '' : 'missing'}">
-            <div class="field-name">Valid</div>
-            <div class="field-value">${validation.valid ? 'Yes' : 'No'}</div>
+        <div class="field-item ${validation.is_supported ? '' : 'missing'}">
+            <div class="field-name">Supported</div>
+            <div class="field-value">${validation.is_supported ? 'Yes' : 'No'}</div>
+        </div>
+        <div class="field-item ${validation.is_readable ? '' : 'missing'}">
+            <div class="field-name">Readable</div>
+            <div class="field-value">${validation.is_readable ? 'Yes' : 'No'}</div>
         </div>
         <div class="field-item">
             <div class="field-name">File Type</div>
@@ -191,10 +228,10 @@ function renderDocumentDetails(data) {
             <div class="field-value">${validation.page_count || 'N/A'}</div>
         </div>
         <div class="field-item">
-            <div class="field-name">File Size</div>
-            <div class="field-value">${validation.file_size ? formatBytes(validation.file_size) : 'N/A'}</div>
+            <div class="field-name">Status</div>
+            <div class="field-value"><span class="status-badge ${validation.status}">${validation.status}</span></div>
         </div>
-        ${validation.errors.length > 0 ? `
+        ${validation.errors && validation.errors.length > 0 ? `
             <div class="field-item missing">
                 <div class="field-name">Errors</div>
                 <div class="field-value">${validation.errors.map(e => escapeHtml(e)).join(', ')}</div>
@@ -203,56 +240,97 @@ function renderDocumentDetails(data) {
     `;
     
     // Extracted Fields
-    if (data.extracted_data && data.extracted_data.fields) {
-        const fieldsHtml = Object.entries(data.extracted_data.fields).map(([key, value]) => `
-            <div class="field-item ${value.value === null ? 'missing' : ''}">
-                <div class="field-name">${escapeHtml(key)}</div>
-                <div class="field-value">${value.value === null ? 'Not found' : escapeHtml(String(value.value))}</div>
-                ${value.evidence ? `<div class="field-evidence">Evidence: ${escapeHtml(value.evidence)} (Page ${value.page_number})</div>` : ''}
+    const extracted = data.extracted_data;
+    const fields = [];
+    
+    // Helper to render field with confidence
+    const renderField = (name, field) => {
+        if (!field || !field.value) return '';
+        const confidence = field.confidence ? ` (${Math.round(field.confidence * 100)}% confidence)` : '';
+        return `
+            <div class="field-item">
+                <div class="field-name">${escapeHtml(name)}</div>
+                <div class="field-value">${escapeHtml(String(field.value))}${confidence}</div>
+                <div class="field-evidence">Page ${field.page_number}</div>
             </div>
-        `).join('');
-        document.getElementById('extracted-fields').innerHTML = `<div class="field-grid">${fieldsHtml}</div>`;
+        `;
+    };
+    
+    // Invoice fields
+    if (extracted.invoice_number) fields.push(renderField('Invoice Number', extracted.invoice_number));
+    if (extracted.invoice_date) fields.push(renderField('Invoice Date', extracted.invoice_date));
+    if (extracted.vendor_name) fields.push(renderField('Vendor Name', extracted.vendor_name));
+    if (extracted.currency) fields.push(renderField('Currency', extracted.currency));
+    if (extracted.subtotal) fields.push(renderField('Subtotal', extracted.subtotal));
+    if (extracted.tax_amount) fields.push(renderField('Tax Amount', extracted.tax_amount));
+    if (extracted.discount) fields.push(renderField('Discount', extracted.discount));
+    if (extracted.total_amount) fields.push(renderField('Total Amount', extracted.total_amount));
+    
+    // Balance sheet fields
+    if (extracted.total_assets) fields.push(renderField('Total Assets', extracted.total_assets));
+    if (extracted.total_liabilities) fields.push(renderField('Total Liabilities', extracted.total_liabilities));
+    if (extracted.total_equity) fields.push(renderField('Total Equity', extracted.total_equity));
+    
+    // Profit & Loss fields
+    if (extracted.revenue) fields.push(renderField('Revenue', extracted.revenue));
+    if (extracted.expenses) fields.push(renderField('Expenses', extracted.expenses));
+    if (extracted.net_profit) fields.push(renderField('Net Profit', extracted.net_profit));
+    
+    // Cash flow fields
+    if (extracted.operating_cash_flow) fields.push(renderField('Operating Cash Flow', extracted.operating_cash_flow));
+    if (extracted.investing_cash_flow) fields.push(renderField('Investing Cash Flow', extracted.investing_cash_flow));
+    if (extracted.financing_cash_flow) fields.push(renderField('Financing Cash Flow', extracted.financing_cash_flow));
+    if (extracted.net_cash_flow) fields.push(renderField('Net Cash Flow', extracted.net_cash_flow));
+    
+    if (fields.length > 0) {
+        document.getElementById('extracted-fields').innerHTML = `<div class="field-grid">${fields.join('')}</div>`;
     } else {
         document.getElementById('extracted-fields').innerHTML = '<p>No fields extracted</p>';
     }
     
-    // Tables
-    if (data.extracted_data && data.extracted_data.tables && data.extracted_data.tables.length > 0) {
-        const tablesHtml = data.extracted_data.tables.map((table, idx) => `
+    // Line Items (for invoices)
+    if (extracted.line_items && extracted.line_items.length > 0) {
+        const tableHtml = `
             <div class="table-container">
-                <h4>${escapeHtml(table.name || `Table ${idx + 1}`)}</h4>
+                <h4>Line Items</h4>
                 <table>
                     <thead>
                         <tr>
-                            ${table.headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}
+                            <th>Description</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Amount</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${table.rows.map(row => `
+                        ${extracted.line_items.map(item => `
                             <tr>
-                                ${table.headers.map(h => `<td>${escapeHtml(String(row[h] || ''))}</td>`).join('')}
+                                <td>${escapeHtml(item.description)}</td>
+                                <td>${item.quantity}</td>
+                                <td>${item.unit_price}</td>
+                                <td>${item.amount}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
             </div>
-        `).join('');
-        document.getElementById('extracted-tables').innerHTML = tablesHtml;
+        `;
+        document.getElementById('extracted-tables').innerHTML = tableHtml;
     } else {
         document.getElementById('extracted-tables').innerHTML = '<p>No tables extracted</p>';
     }
     
     // Financial Validations
-    if (data.financial_validations && data.financial_validations.length > 0) {
-        const validationsHtml = data.financial_validations.map(v => `
+    if (data.validation && data.validation.checks && data.validation.checks.length > 0) {
+        const validationsHtml = data.validation.checks.map(v => `
             <div class="validation-item ${v.status}">
-                <div class="check-name">${escapeHtml(v.check_name)} <span class="status ${v.status}">${v.status}</span></div>
+                <div class="check-name">${escapeHtml(v.name)} <span class="status ${v.status}">${v.status}</span></div>
                 <div class="formula">${escapeHtml(v.formula)}</div>
                 <div class="validation-details">
-                    ${Object.entries(v.inputs).map(([k, val]) => `<div>${escapeHtml(k)}: ${escapeHtml(val)}</div>`).join('')}
-                    ${v.calculated_value !== null ? `<div>Calculated: ${escapeHtml(v.calculated_value)}</div>` : ''}
-                    ${v.reported_value !== null ? `<div>Reported: ${escapeHtml(v.reported_value)}</div>` : ''}
-                    ${v.variance !== null ? `<div>Variance: ${escapeHtml(v.variance)}</div>` : ''}
+                    ${Object.entries(v.operands).map(([k, val]) => `<div>${escapeHtml(k)}: ${escapeHtml(String(val))}</div>`).join('')}
+                    ${v.calculated_value !== null ? `<div>Calculated: ${escapeHtml(String(v.calculated_value))}</div>` : ''}
+                    ${v.reported_value !== null ? `<div>Reported: ${escapeHtml(String(v.reported_value))}</div>` : ''}
+                    ${v.variance !== null ? `<div>Variance: ${escapeHtml(String(v.variance))}</div>` : ''}
                 </div>
             </div>
         `).join('');
@@ -263,45 +341,6 @@ function renderDocumentDetails(data) {
     
     // Raw JSON
     document.getElementById('raw-json').textContent = JSON.stringify(data, null, 2);
-    
-    // Restore detail content structure
-    restoreDetailStructure();
-}
-
-function restoreDetailStructure() {
-    document.getElementById('detail-content').innerHTML = `
-        <div class="detail-section">
-            <h3>Document Information</h3>
-            <div id="document-info"></div>
-        </div>
-        <div class="detail-section">
-            <h3>File Validation</h3>
-            <div id="file-validation"></div>
-        </div>
-        <div class="detail-section">
-            <h3>Extracted Fields</h3>
-            <div id="extracted-fields"></div>
-        </div>
-        <div class="detail-section">
-            <h3>Tables</h3>
-            <div id="extracted-tables"></div>
-        </div>
-        <div class="detail-section">
-            <h3>Financial Validations</h3>
-            <div id="financial-validations"></div>
-        </div>
-        <div class="detail-section">
-            <h3>Raw JSON</h3>
-            <button class="btn btn-secondary" id="toggle-json">Toggle Raw JSON</button>
-            <pre id="raw-json" style="display: none;"></pre>
-        </div>
-    `;
-    
-    // Re-attach toggle event
-    document.getElementById('toggle-json').addEventListener('click', () => {
-        const rawJson = document.getElementById('raw-json');
-        rawJson.style.display = rawJson.style.display === 'none' ? 'block' : 'none';
-    });
 }
 
 // Back to Dashboard
