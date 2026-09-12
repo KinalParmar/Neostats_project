@@ -1,8 +1,22 @@
 from typing import List, Dict, Any, Tuple
 import io
 import logging
-import pdfplumber
-from PIL import Image
+
+try:
+    import pdfplumber
+    PDFPLUMBER_AVAILABLE = True
+except ImportError:
+    PDFPLUMBER_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("pdfplumber not available")
+
+try:
+    from PIL import Image
+    PILLOW_AVAILABLE = True
+except ImportError:
+    PILLOW_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("Pillow not available")
 
 logger = logging.getLogger(__name__)
 
@@ -28,20 +42,23 @@ class OCRService:
         pages_data = []
         
         # Try native text extraction first
-        try:
-            with pdfplumber.open(io.BytesIO(content)) as pdf:
-                for page_num, page in enumerate(pdf.pages[:3], start=1):  # Max 3 pages
-                    text = page.extract_text()
-                    if text:
-                        pages_data.append({
-                            "page_number": page_num,
-                            "text": text
-                        })
-            
-            if pages_data:
-                return pages_data, "native"
-        except Exception as e:
-            logger.error(f"Native PDF extraction failed: {e}")
+        if PDFPLUMBER_AVAILABLE:
+            try:
+                with pdfplumber.open(io.BytesIO(content)) as pdf:
+                    for page_num, page in enumerate(pdf.pages[:3], start=1):  # Max 3 pages
+                        text = page.extract_text()
+                        if text:
+                            pages_data.append({
+                                "page_number": page_num,
+                                "text": text
+                            })
+                
+                if pages_data:
+                    return pages_data, "native"
+            except Exception as e:
+                logger.error(f"Native PDF extraction failed: {e}")
+        else:
+            logger.warning("pdfplumber not available - skipping native extraction")
         
         # Fall back to OCR if available
         if self.easyocr_available:
@@ -60,7 +77,7 @@ class OCRService:
         """
         pages_data = []
         
-        if self.easyocr_available:
+        if self.easyocr_available and PILLOW_AVAILABLE:
             try:
                 image = Image.open(io.BytesIO(content))
                 result = self.easyocr_reader.readtext(image)
@@ -75,12 +92,18 @@ class OCRService:
                 return pages_data, "ocr"
             except Exception as e:
                 logger.error(f"OCR image extraction failed: {e}")
+        else:
+            logger.warning("EasyOCR or Pillow not available - cannot extract from images")
         
         return pages_data, "none"
     
     def _ocr_pdf(self, content: bytes) -> List[Dict[str, Any]]:
         """OCR PDF pages using EasyOCR"""
         pages_data = []
+        
+        if not PILLOW_AVAILABLE:
+            logger.warning("Pillow not available - cannot OCR PDF")
+            return pages_data
         
         try:
             import fitz  # PyMuPDF

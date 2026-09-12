@@ -1,18 +1,18 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
-pydantic-settings==2.1.0
 python-multipart==0.0.6
-pdfplumber==0.10.3
-PyMuPDF==1.23.8
-Pillow==10.1.0
-openai==1.3.7
-sqlalchemy==2.0.23
-aiosqlite==0.19.0
 python-dotenv==1.0.0
 httpx==0.25.2
-numpy<2.0.0
 
-# Optional AI/ML dependencies - comment out for Render deployment
+# Optional dependencies - comment out for Render deployment
+# pydantic-settings==2.1.0
+# pdfplumber==0.10.3
+# PyMuPDF==1.23.8
+# Pillow==10.1.0
+# openai==1.3.7
+# sqlalchemy==2.0.23
+# aiosqlite==0.19.0
+# numpy<2.0.0
 # easyocr==1.7.1  # Requires PyTorch - too large for Render
 # pytesseract==0.3.10  # Requires system-level tesseract
