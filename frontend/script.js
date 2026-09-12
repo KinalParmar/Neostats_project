@@ -1,5 +1,7 @@
 // API Configuration - Update this to your deployed backend URL
-const API_BASE_URL = 'http://localhost:8002/api/v1';
+const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:8002/api/v1' 
+    : 'https://your-backend-url.onrender.com/api/v1'; // Replace with actual backend URL
 
 // Tab Navigation
 document.querySelectorAll('.tab-btn').forEach(btn => {
