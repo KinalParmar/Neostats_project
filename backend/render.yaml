@@ -6,6 +6,6 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PORT
-        value: 8002
+        value: 8000
       - key: PYTHON_VERSION
         value: 3.10
