@@ -1,11 +1,36 @@
 from typing import List, Dict, Any, Tuple
-import fitz  # PyMuPDF
-import pdfplumber
-import pytesseract
-from PIL import Image
 import io
-import easyocr
-import numpy as np
+
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
+
+try:
+    import pdfplumber
+except ImportError:
+    pdfplumber = None
+
+try:
+    import pytesseract
+except ImportError:
+    pytesseract = None
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+try:
+    import easyocr
+except ImportError:
+    easyocr = None
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 from app.core.config import settings
 
 
@@ -13,8 +38,7 @@ class TextExtractor:
     """Extracts text from PDFs and images using native extraction or OCR"""
     
     def __init__(self):
-        # Configure Tesseract path if provided
-        if settings.TESSERACT_PATH:
+        if pytesseract is not None and settings.TESSERACT_PATH:
             pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_PATH
         
         # Initialize EasyOCR reader (lazy load)
@@ -23,6 +47,8 @@ class TextExtractor:
     @property
     def easyocr_reader(self):
         """Lazy load EasyOCR reader"""
+        if easyocr is None:
+            raise RuntimeError("EasyOCR is not installed. Please install the OCR dependencies.")
         if self._easyocr_reader is None:
             self._easyocr_reader = easyocr.Reader(['en'])
         return self._easyocr_reader
@@ -91,6 +117,8 @@ class TextExtractor:
     
     def _ocr_pdf(self, content: bytes) -> List[Dict[str, Any]]:
         """OCR a PDF by converting pages to images"""
+        if fitz is None:
+            raise RuntimeError("PyMuPDF is not installed. Please install the backend dependencies.")
         pages_data = []
         
         doc = fitz.open(stream=content, filetype="pdf")
@@ -136,6 +164,8 @@ class TextExtractor:
         Extract text from image (JPG, PNG) using OCR.
         Returns list with single page data.
         """
+        if Image is None:
+            raise RuntimeError("Pillow is not installed. Please install the backend dependencies.")
         img = Image.open(io.BytesIO(content))
         
         # Try EasyOCR first (no external installation required)
@@ -163,6 +193,8 @@ class TextExtractor:
     
     def _ocr_with_tesseract(self, img: Image.Image) -> str:
         """Extract text using Tesseract OCR"""
+        if pytesseract is None:
+            raise RuntimeError("pytesseract is not installed. Please install the backend dependencies.")
         try:
             text = pytesseract.image_to_string(img)
             return text
@@ -174,6 +206,8 @@ class TextExtractor:
     
     def _ocr_with_easyocr(self, img: Image.Image) -> str:
         """Extract text using EasyOCR (fallback)"""
+        if easyocr is None or np is None:
+            raise RuntimeError("EasyOCR dependencies are not installed. Please install the backend dependencies.")
         try:
             # Convert PIL image to numpy array
             img_array = np.array(img)
