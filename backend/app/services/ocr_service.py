@@ -13,11 +13,12 @@ class OCRService:
     def __init__(self):
         try:
             import easyocr
-            self.easyocr_reader = easyocr.Reader(['en'])
+            self.easyocr_reader = easyocr.Reader(['en'], gpu=False)
             self.easyocr_available = True
+            logger.info("EasyOCR initialized (CPU mode)")
         except ImportError:
             self.easyocr_available = False
-            logger.warning("EasyOCR not available")
+            logger.warning("EasyOCR not available - using native text extraction only")
     
     def extract_from_pdf(self, content: bytes) -> Tuple[List[Dict[str, Any]], str]:
         """
