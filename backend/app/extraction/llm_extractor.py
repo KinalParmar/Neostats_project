@@ -110,38 +110,122 @@ class LLMExtractor:
         """
         full_text = self._prepare_text_with_pages(text_by_page)
         
+        # Debug: Print extracted text
+        print(f"DEBUG - Extracted text length: {len(full_text)}")
+        print(f"DEBUG - First 500 chars: {full_text[:500]}")
+        print(f"DEBUG - Document type: {document_type}")
+        
         # Basic field extraction using regex
         fields = {}
         
-        # Try to extract dates
-        date_pattern = r'\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4}'
-        dates = re.findall(date_pattern, full_text)
-        if dates:
-            fields["date"] = {
-                "value": dates[0],
-                "evidence": dates[0],
-                "page_number": 1
-            }
+        # Try to extract dates (more flexible patterns)
+        date_patterns = [
+            r'\d{4}[-/]\d{1,2}[-/]\d{1,2}',
+            r'\d{1,2}[-/]\d{1,2}[-/]\d{4}',
+            r'\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}',
+            r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}'
+        ]
+        for pattern in date_patterns:
+            dates = re.findall(pattern, full_text, re.IGNORECASE)
+            if dates:
+                fields["date"] = {
+                    "value": dates[0],
+                    "evidence": dates[0],
+                    "page_number": 1
+                }
+                break
         
-        # Try to extract monetary values
-        money_pattern = r'[\$€£]?\s*[\d,]+\.?\d*\s*(?:USD|EUR|GBP|dollars?|euros?|pounds?)?'
-        money_values = re.findall(money_pattern, full_text)
-        if money_values:
-            fields["total"] = {
-                "value": money_values[0],
-                "evidence": money_values[0],
-                "page_number": 1
-            }
+        # Try to extract monetary values (more flexible)
+        money_patterns = [
+            r'[\$€£₹₽]\s*[\d,]+\.?\d*\s*(?:USD|EUR|GBP|INR|RUB|dollars?|euros?|pounds?|rupees?)?',
+            r'[\d,]+\.?\d*\s*(?:USD|EUR|GBP|INR|RUB|dollars?|euros?|pounds?|rupees?)',
+            r'total[:\s]*[\$€£₹₽]?\s*[\d,]+\.?\d*',
+            r'amount[:\s]*[\$€£₹₽]?\s*[\d,]+\.?\d*',
+            r'sum[:\s]*[\$€£₹₽]?\s*[\d,]+\.?\d*'
+        ]
+        for pattern in money_patterns:
+            money_values = re.findall(pattern, full_text, re.IGNORECASE)
+            if money_values:
+                fields["total"] = {
+                    "value": money_values[0],
+                    "evidence": money_values[0],
+                    "page_number": 1
+                }
+                break
         
         # Try to extract invoice numbers
-        invoice_pattern = r'(?:invoice|inv|bill)\s*#?\s*[:#]?\s*([A-Z0-9-]+)'
-        invoice_match = re.search(invoice_pattern, full_text, re.IGNORECASE)
-        if invoice_match:
-            fields["invoice_number"] = {
-                "value": invoice_match.group(1),
-                "evidence": invoice_match.group(0),
-                "page_number": 1
-            }
+        invoice_patterns = [
+            r'(?:invoice|inv|bill)\s*#?\s*[:#]?\s*([A-Z0-9-]+)',
+            r'invoice\s*no\.?\s*[:#]?\s*([A-Z0-9-]+)',
+            r'inv\s*#?\s*([A-Z0-9-]+)'
+        ]
+        for pattern in invoice_patterns:
+            invoice_match = re.search(pattern, full_text, re.IGNORECASE)
+            if invoice_match:
+                fields["invoice_number"] = {
+                    "value": invoice_match.group(1) if invoice_match.groups() else invoice_match.group(0),
+                    "evidence": invoice_match.group(0),
+                    "page_number": 1
+                }
+                break
+        
+        # Try to extract company names
+        company_patterns = [
+            r'(?:company|from|vendor|supplier|client)[:\s]+([A-Z][A-Za-z\s&]+?)(?:\n|,|address)',
+            r'^(?:[A-Z][A-Za-z\s&]+?)(?:\n|,|address|invoice)',
+        ]
+        for pattern in company_patterns:
+            company_match = re.search(pattern, full_text, re.IGNORECASE | re.MULTILINE)
+            if company_match:
+                company_name = company_match.group(1).strip() if company_match.groups() else company_match.group(0).strip()
+                if len(company_name) > 2 and len(company_name) < 100:
+                    fields["company_name"] = {
+                        "value": company_name,
+                        "evidence": company_match.group(0),
+                        "page_number": 1
+                    }
+                    break
+        
+        # Document-specific fields
+        if document_type == "invoice":
+            # Try to extract line items
+            line_item_pattern = r'([A-Za-z\s]+?)\s+[\d,]+\.?\d*\s+[\$€£₹₽]?\s*[\d,]+\.?\d*'
+            line_items = re.findall(line_item_pattern, full_text)
+            if line_items:
+                fields["line_items_count"] = {
+                    "value": str(len(line_items)),
+                    "evidence": f"Found {len(line_items)} potential line items",
+                    "page_number": 1
+                }
+        
+        elif document_type == "balance_sheet":
+            # Try to extract assets, liabilities, equity
+            assets_pattern = r'(?:total\s+assets|assets)[:\s]*[\$€£₹₽]?\s*([\d,]+\.?\d*)'
+            assets_match = re.search(assets_pattern, full_text, re.IGNORECASE)
+            if assets_match:
+                fields["total_assets"] = {
+                    "value": assets_match.group(1),
+                    "evidence": assets_match.group(0),
+                    "page_number": 1
+                }
+            
+            liabilities_pattern = r'(?:total\s+liabilities|liabilities)[:\s]*[\$€£₹₽]?\s*([\d,]+\.?\d*)'
+            liabilities_match = re.search(liabilities_pattern, full_text, re.IGNORECASE)
+            if liabilities_match:
+                fields["total_liabilities"] = {
+                    "value": liabilities_match.group(1),
+                    "evidence": liabilities_match.group(0),
+                    "page_number": 1
+                }
+            
+            equity_pattern = r'(?:total\s+equity|equity|shareholders?\s+equity)[:\s]*[\$€£₹₽]?\s*([\d,]+\.?\d*)'
+            equity_match = re.search(equity_pattern, full_text, re.IGNORECASE)
+            if equity_match:
+                fields["total_equity"] = {
+                    "value": equity_match.group(1),
+                    "evidence": equity_match.group(0),
+                    "page_number": 1
+                }
         
         # Add metadata
         return {
@@ -152,7 +236,7 @@ class LLMExtractor:
                 "llm_provider": "fallback",
                 "document_type": document_type,
                 "total_pages": len(text_by_page),
-                "note": "LLM not available, using rule-based extraction"
+                "note": "LLM not available, using rule-based extraction. Install Ollama for better extraction."
             }
         }
     

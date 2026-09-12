@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.config import settings
-from app.api import health, documents
+from app.api.routes import health_router, documents_router
 
 app = FastAPI(
     title="Document Intelligence Platform",
@@ -18,9 +17,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(health.router, prefix="/api", tags=["health"])
-app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
+# Include routers with API versioning
+app.include_router(health_router, prefix="/api/v1", tags=["health"])
+app.include_router(documents_router, prefix="/api/v1/documents", tags=["documents"])
 
 @app.get("/")
 async def root():

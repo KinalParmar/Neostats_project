@@ -30,8 +30,30 @@ class TextExtractor:
     def extract_from_pdf(self, content: bytes) -> Tuple[List[Dict[str, Any]], str]:
         """
         Extract text from PDF.
-        First tries native text extraction, falls back to OCR if needed.
-        Returns (pages_data, extraction_method)
+        Returns list of page data and extraction method used.
+        """
+        # First try native text extraction
+        try:
+            pages_data, method = self._extract_native_pdf(content)
+            print(f"DEBUG - Native PDF extraction: method={method}, pages={len(pages_data)}, text_length={sum(len(p.get('text', '')) for p in pages_data)}")
+            if pages_data and any(page.get("text") for page in pages_data):
+                return pages_data, method
+        except Exception as e:
+            print(f"DEBUG - Native PDF extraction failed: {e}")
+        
+        # Fall back to OCR
+        try:
+            pages_data = self._ocr_pdf(content)
+            print(f"DEBUG - OCR PDF extraction: pages={len(pages_data)}, text_length={sum(len(p.get('text', '')) for p in pages_data)}")
+            return pages_data, "ocr"
+        except Exception as e:
+            print(f"DEBUG - OCR PDF extraction failed: {e}")
+            raise Exception(f"PDF extraction failed: {str(e)}")
+    
+    def _extract_native_pdf(self, content: bytes) -> Tuple[List[Dict[str, Any]], str]:
+        """
+        Extract text from PDF using native text extraction.
+        Returns list of page data and extraction method used.
         """
         pages_data = []
         extraction_method = "native"
